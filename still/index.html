@@ -136,6 +136,7 @@ tbody td{padding:12px 14px;font-size:13px;vertical-align:middle;}
 <div class="topbar"><div class="topbar-left"><img src="https://www.still.dk/typo3conf/ext/mmpackage/Resources/Public/Images/still-logo.svg" alt="STILL" onerror="this.style.display='none'"><div class="topbar-brand">Maskinreservation</div></div><div class="tr"><div class="tu">Logget ind som <span id="cur-name"></span></div><span class="rb" id="cur-rb"></span><button class="btn-lo" onclick="doLogout()">Log ud</button></div></div>
 <div class="nav-tabs">
 <button class="nav-tab active" data-tab="maskiner" onclick="go('maskiner')">Maskiner</button>
+<button class="nav-tab" data-tab="mine" onclick="go('mine')">Mine reservationer</button>
 <button class="nav-tab adm-tab" data-tab="dashboard" onclick="go('dashboard')">Dashboard</button>
 <button class="nav-tab adm-tab" data-tab="log" onclick="go('log')">Aktivitetslog</button>
 <button class="nav-tab adm-tab" data-tab="brugere" onclick="go('brugere')">Brugere</button>
@@ -148,6 +149,10 @@ tbody td{padding:12px 14px;font-size:13px;vertical-align:middle;}
 <select class="fsel" id="fs-type" onchange="curPage=1;rMachines()"><option value="alle">Alle typer</option></select></div>
 <div class="tw"><table><thead><tr><th>Equipment Nr.</th><th>Type</th><th>Serienummer</th><th>Status</th><th>Reserveret af</th><th>Udløber</th><th>Handling</th></tr></thead><tbody id="mtb"></tbody></table></div>
 <div class="pag" id="pag"></div></div>
+<div class="main" id="tab-mine" style="display:none">
+<div class="sec"><div class="sec-title">Aktive reservationer</div><div id="my-active"></div></div>
+<div class="sec"><div class="sec-title">Historik (frigivne og udl\u00f8bne)</div><div id="my-history"></div></div>
+</div>
 <div class="main" id="tab-dashboard" style="display:none"><div class="srow" id="d-stats"></div><div class="dg2"><div class="cc"><div class="ct">Reservationer pr. måned</div><div class="cw"><canvas id="c-monthly"></canvas></div></div><div class="cc"><div class="ct">Top brugere</div><div id="lb"></div></div></div><div class="dg2"><div class="cc"><div class="ct">Aktive reservationer nu</div><div id="ar-list" style="max-height:300px;overflow-y:auto"></div></div><div class="cc"><div class="ct">Ledig vs. reserveret</div><div class="cw"><canvas id="c-donut"></canvas></div></div></div></div>
 <div class="main" id="tab-log" style="display:none"><div class="lf-row"><button class="lf-btn active" onclick="fLog('alle',this)">Alle</button><button class="lf-btn" onclick="fLog('login',this)">Logins</button><button class="lf-btn" onclick="fLog('reserve',this)">Reservationer</button><button class="lf-btn" onclick="fLog('release',this)">Frigivelser</button><button class="lf-btn" onclick="fLog('admin',this)">Admin</button><button class="lf-btn" onclick="fLog('logout',this)">Logouts</button></div><div id="log-list"></div></div>
 <div class="main" id="tab-brugere" style="display:none"><div class="sec"><div class="sec-title">Tilføj bruger</div><div class="add-form"><div class="field"><label>Brugernavn</label><input type="text" id="nu-u" placeholder="f.eks. jens.jensen"></div><div class="field"><label>Visningsnavn</label><input type="text" id="nu-d" placeholder="f.eks. Jens Jensen"></div><div class="field"><label>Adgangskode</label><input type="password" id="nu-p" placeholder="Adgangskode"></div><div class="field"><label>Rolle</label><select id="nu-r"><option value="bruger">Bruger</option><option value="admin">Admin</option></select></div><button class="btn-add" onclick="addUser()">+ Tilføj</button></div></div><div class="sec"><div class="sec-title">Admin-brugere</div><p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Har adgang til Dashboard, Aktivitetslog, Brugerstyring og Admin-panelet.</p><div id="au-list"></div></div><div class="sec"><div class="sec-title">Normale brugere</div><div id="nu-list"></div></div></div>
@@ -486,6 +491,41 @@ function rLog(){
   el.innerHTML=html;
 }
 
+/* ===== MINE RESERVATIONER ===== */
+async function rMine(){
+  var activeEl=document.getElementById('my-active');
+  var histEl=document.getElementById('my-history');
+  if(!activeEl||!histEl)return;
+  /* Active reservations for current user */
+  var myActive=machinesArr.filter(function(m){return m.status==='reserveret'&&m.reservation&&m.reservation.user_id===cu.id;});
+  if(myActive.length){
+    var html='<div class="tw"><table><thead><tr><th>Equipment Nr.</th><th>Type</th><th>Serienummer</th><th>Udl\u00f8ber</th><th>Handling</th></tr></thead><tbody>';
+    myActive.forEach(function(m){
+      var cdd=cdf(m.reservation.expires_at);
+      html+='<tr><td><div class="mid">'+esc(m.equipment_nr)+'</div></td><td style="font-size:13px;font-weight:500">'+esc(m.type)+'</td><td class="mserial">'+esc(m.serienummer)+'</td><td><div class="cd '+(cdd.urg?'urg':'')+'">'+esc(cdd.text)+'</div><div style="font-size:11px;color:var(--muted)">Udl. '+fd(m.reservation.expires_at)+'</div></td><td><button class="btn-rel" onclick="openM(\'release\',\''+m.id+'\')">Frigiv</button></td></tr>';
+    });
+    html+='</tbody></table></div>';
+    activeEl.innerHTML=html;
+  }else{
+    activeEl.textContent='';var e=document.createElement('div');e.className='empty';e.textContent='Du har ingen aktive reservationer.';activeEl.appendChild(e);
+  }
+  /* History: released/expired reservations for current user */
+  var hRes=await sb.from('reservations').select('*, machines(equipment_nr, type, serienummer)').eq('user_id',cu.id).neq('status','active').order('created_at',{ascending:false}).limit(50);
+  var hist=hRes.data||[];
+  if(hist.length){
+    var hHtml='<div class="tw"><table><thead><tr><th>Equipment Nr.</th><th>Type</th><th>Reserveret</th><th>Frigivet/Udl\u00f8bet</th><th>Status</th></tr></thead><tbody>';
+    hist.forEach(function(r){
+      var m=r.machines||{};
+      var statusBadge=r.status==='released'?'<span class="badge bl">Frigivet</span>':'<span class="badge" style="background:rgba(21,101,192,.08);color:var(--blue);border:1px solid rgba(21,101,192,.2)">Udl\u00f8bet</span>';
+      hHtml+='<tr><td><div class="mid">'+esc(m.equipment_nr)+'</div></td><td style="font-size:13px">'+esc(m.type)+'</td><td style="font-size:13px">'+fd(r.created_at)+'</td><td style="font-size:13px">'+(r.released_at?fd(r.released_at):fd(r.expires_at))+'</td><td>'+statusBadge+'</td></tr>';
+    });
+    hHtml+='</tbody></table></div>';
+    histEl.innerHTML=hHtml;
+  }else{
+    histEl.textContent='';var e2=document.createElement('div');e2.className='empty';e2.textContent='Ingen tidligere reservationer.';histEl.appendChild(e2);
+  }
+}
+
 /* ===== DASHBOARD ===== */
 var mNames=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 async function rDash(){
@@ -606,10 +646,11 @@ function cancelBulk(){pendingBulk=null;document.getElementById('upload-preview')
 
 /* ===== NAV ===== */
 function go(tab){
-  ['maskiner','dashboard','log','brugere','admin'].forEach(function(t){
+  ['maskiner','mine','dashboard','log','brugere','admin'].forEach(function(t){
     var el=document.getElementById('tab-'+t);if(el)el.style.display=t===tab?'block':'none';
     var btn=document.querySelector('[data-tab="'+t+'"]');if(btn)btn.classList.toggle('active',t===tab);
   });
+  if(tab==='mine')rMine();
   if(tab==='dashboard')rDash();
   if(tab==='log'){loadLogs().then(function(){rLog();});}
   if(tab==='brugere')rUsers();
