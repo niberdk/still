@@ -190,11 +190,6 @@ tbody td{padding:12px 14px;font-size:14px;vertical-align:middle;}
     <div class="field"><label>Adgangskode</label><input type="password" id="lp" placeholder="Adgangskode" autocomplete="current-password"></div>
     <button class="btn-p" onclick="doLogin()">Log ind</button>
     <div class="lerr" id="lerr"></div>
-    <div class="demo-hint">
-      <strong>Demo login:</strong><br>
-      Admin: <strong>admin</strong> / <strong>admin</strong><br>
-      Bruger: <strong>bruger1</strong> / <strong>pas001</strong>
-    </div>
   </div>
 </div>
 
@@ -345,7 +340,7 @@ const mNames = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov
 
 // Load users from Supabase (no passwords sent to client)
 async function loadUsers() {
-  const { data, error } = await sb.from('profiles').select('id, username, display_name, role');
+  const { data, error } = await sb.from('profiles_safe').select('id, username, display_name, role');
   if (error) { console.error('[Supabase] Load users failed:', error.message); return; }
   users = {};
   data.forEach(u => {
@@ -471,14 +466,10 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 async function alog(type, tekst, maskinId, bruger) {
   const displayName = bruger || cu?.displayName;
   const machineDbId = maskinId && machines[maskinId] ? machines[maskinId].dbId : null;
-  // Write to Supabase
-  await sb.from('activity_log').insert({
-    type: type,
-    tekst: tekst,
-    bruger_id: cu?.id || null,
-    machine_id: machineDbId
-  }).then(({ error }) => { if (error) console.error('[Log]', error.message); });
-  // Also keep local copy for immediate UI
+  if (cu?.id) {
+    const { error } = await sb.rpc('write_log', { p_user_id: cu.id, p_type: type, p_tekst: tekst, p_machine_id: machineDbId });
+    if (error) console.error('[Log]', error.message);
+  }
   logs.unshift({type, tekst, maskinId:maskinId||'', tid:new Date(), bruger: displayName});
 }
 function fd(d) { return d ? new Date(d).toLocaleDateString('da-DK') : ''; }
@@ -543,7 +534,7 @@ function rMachines() {
       : canRel
         ? `<button class="btn-rel" onclick="openM('release','${id}')">Frigiv</button>`
         : `<span style="font-size:12px;color:var(--muted)">Reserveret</span>`;
-    return `<tr><td><div class="mid">${id}</div><div class="mname">${m.navn||''}</div></td><td>${badge}</td><td>${resBy}</td><td>${udl}</td><td>${action}</td></tr>`;
+    return `<tr><td><div class="mid">${esc(id)}</div><div class="mname">${esc(m.navn||'')}</div></td><td>${badge}</td><td>${resBy}</td><td>${udl}</td><td>${action}</td></tr>`;
   }).join('');
 }
 
@@ -599,7 +590,7 @@ function rLog() {
   if (!list.length) { el.innerHTML=`<div class="empty">Ingen aktivitet.</div>`; return; }
   el.innerHTML = list.map(l=>`
     <div class="log-entry ${l.type}">
-      <strong>${l.bruger}</strong> — ${l.tekst}
+      <strong>${esc(l.bruger)}</strong> — ${esc(l.tekst)}
       <div class="log-time">${ft(l.tid)}</div>
     </div>`).join('');
 }
@@ -610,8 +601,8 @@ async function addMachine() {
   const navn=document.getElementById('nm-name').value.trim();
   if (!/^\d{7}$/.test(id)) { toast('ID skal være præcis 7 cifre.','err'); return; }
   if (machines[id]) { toast('Maskine '+id+' findes allerede.','err'); return; }
-  const { error } = await sb.from('machines').insert({ equipment_nr: id, navn: navn || null });
-  if (error) { toast('Fejl: ' + error.message, 'err'); return; }
+  const { data, error } = await sb.rpc('add_machine', { p_admin_id: cu.id, p_equipment_nr: id, p_navn: navn || null });
+  if (error || !data.success) { toast('Fejl: ' + (error?.message || data?.error), 'err'); return; }
   await alog('admin',`Maskine tilføjet: ${id}${navn?' ('+navn+')':''}`);
   await loadMachines();
   document.getElementById('nm-id').value=''; document.getElementById('nm-name').value='';
@@ -621,8 +612,8 @@ async function delMachine(id) {
   if (!confirm(`Fjern maskine ${id}?`)) return;
   const m = machines[id];
   const navn=m?.navn||'';
-  const { error } = await sb.from('machines').delete().eq('id', m.dbId);
-  if (error) { toast('Fejl: ' + error.message, 'err'); return; }
+  const { data: delData, error } = await sb.rpc('delete_machine', { p_admin_id: cu.id, p_machine_id: m.dbId });
+  if (error || !delData.success) { toast('Fejl: ' + (error?.message || delData?.error), 'err'); return; }
   await alog('admin',`Maskine fjernet: ${id}${navn?' ('+navn+')':''}`);
   await loadMachines();
   rAll(); toast('Maskine '+id+' fjernet.','ok');
@@ -632,8 +623,8 @@ function rAdminM() {
   const list=Object.entries(machines).sort((a,b)=>a[0].localeCompare(b[0]));
   if (!list.length) { tb.innerHTML=`<tr><td colspan="5"><div class="empty">Ingen maskiner.</div></td></tr>`; return; }
   tb.innerHTML=list.map(([id,m])=>`<tr>
-    <td class="mid">${id}</td>
-    <td>${m.navn||'—'}</td>
+    <td class="mid">${esc(id)}</td>
+    <td>${esc(m.navn||'—')}</td>
     <td>${m.status==='reserveret'?'<span class="badge br">Reserveret</span>':'<span class="badge bl">Ledig</span>'}</td>
     <td style="font-size:13px">${m.reserveretAf||'—'}</td>
     <td><button class="btn-del" onclick="delMachine('${id}')">Fjern</button></td>
@@ -648,11 +639,8 @@ async function addUser() {
   const r=document.getElementById('nu-r').value;
   if (!u||!d||!p) { toast('Udfyld alle felter.','err'); return; }
   if (users[u]) { toast('Brugernavnet er i brug.','err'); return; }
-  // Insert with temporary plaintext password, then hash server-side
-  const { error } = await sb.from('profiles').insert({ username: u, password_hash: 'temp', display_name: d, role: r });
-  if (error) { toast('Fejl: ' + error.message, 'err'); return; }
-  const { error: hashErr } = await sb.rpc('hash_new_user_password', { p_username: u, p_password: p });
-  if (hashErr) { console.error('[Hash]', hashErr.message); }
+  const { data: cuData, error } = await sb.rpc('create_user', { p_admin_id: cu.id, p_username: u, p_password: p, p_display_name: d, p_role: r });
+  if (error || !cuData.success) { toast('Fejl: ' + (error?.message || cuData?.error), 'err'); return; }
   await alog('admin',`Bruger oprettet: ${d} (${r})`);
   await loadUsers();
   document.getElementById('nu-u').value=''; document.getElementById('nu-d').value=''; document.getElementById('nu-p').value='';
@@ -662,8 +650,8 @@ async function delUser(username) {
   if (username===cu.username) { toast('Du kan ikke slette dig selv.','err'); return; }
   if (!confirm(`Slet bruger ${users[username]?.displayName}?`)) return;
   const displayName = users[username].displayName;
-  const { error } = await sb.from('profiles').delete().eq('id', users[username].id);
-  if (error) { toast('Fejl: ' + error.message, 'err'); return; }
+  const { data: delData, error } = await sb.rpc('delete_user', { p_admin_id: cu.id, p_target_id: users[username].id });
+  if (error || !delData.success) { toast('Fejl: ' + (error?.message || delData?.error), 'err'); return; }
   await alog('admin',`Bruger slettet: ${displayName}`);
   await loadUsers();
   rUsers(); toast('Bruger slettet.','ok');
@@ -671,9 +659,9 @@ async function delUser(username) {
 async function toggleRole(username) {
   if (username===cu.username) { toast('Du kan ikke ændre din egen rolle.','err'); return; }
   const u=users[username];
-  const newRole = u.role==='admin'?'bruger':'admin';
-  const { error } = await sb.from('profiles').update({ role: newRole }).eq('id', u.id);
-  if (error) { toast('Fejl: ' + error.message, 'err'); return; }
+  const { data: togData, error } = await sb.rpc('toggle_role', { p_admin_id: cu.id, p_target_id: u.id });
+  if (error || !togData.success) { toast('Fejl: ' + (error?.message || togData?.error), 'err'); return; }
+  const newRole = togData.new_role;
   await alog('admin',`Rolle ændret: ${u.displayName} → ${newRole}`);
   await loadUsers();
   rUsers(); toast(`${u.displayName} er nu ${newRole}.`,'ok');
