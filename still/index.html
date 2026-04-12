@@ -233,10 +233,10 @@ async function loadAll(){
 async function doLogin(){
   var u=document.getElementById('lu').value.trim().toLowerCase(),p=document.getElementById('lp').value;
   if(!u||!p){document.getElementById('lerr').textContent='Indtast brugernavn og adgangskode.';return;}
-  document.querySelector('.btn-p').disabled=true;
+  var loginBtn=document.querySelector('.btn-p');loginBtn.disabled=true;loginBtn.textContent='LOGGER IND...';
   var res;
-  try{res=await sb.rpc('authenticate',{p_username:u,p_password:p});}catch(e){document.querySelector('.btn-p').disabled=false;document.getElementById('lerr').textContent='Netv\u00e6rksfejl. Tjek din internetforbindelse og pr\u00f8v igen.';return;}
-  document.querySelector('.btn-p').disabled=false;
+  try{res=await sb.rpc('authenticate',{p_username:u,p_password:p});}catch(e){loginBtn.disabled=false;loginBtn.textContent='LOG IND';document.getElementById('lerr').textContent='Netv\u00e6rksfejl. Tjek din internetforbindelse og pr\u00f8v igen.';return;}
+  loginBtn.disabled=false;loginBtn.textContent='LOG IND';
   if(res.error){document.getElementById('lerr').textContent='Serverfejl. Pr\u00f8v igen om et \u00f8jeblik.';return;}
   if(!res.data||!res.data.success){document.getElementById('lerr').textContent='Forkert brugernavn eller adgangskode.';return;}
   cu=res.data.user;
@@ -390,20 +390,28 @@ function closeModal(){document.getElementById('modal').classList.remove('open');
 /* ===== ACTIONS: RESERVE / RELEASE ===== */
 async function doRes(){
   var m=machinesMap[pendId];if(!m)return;
+  var btn=document.getElementById('m-btn');btn.disabled=true;btn.textContent='Reserverer...';
   var resDays=getResDays();
-  var res=await sb.rpc('reserve_machine',{p_machine_id:pendId,p_user_id:cu.id,p_days:resDays});
-  if(res.error||!res.data||!res.data.success){closeModal();toast(res.data&&res.data.error==='machine_already_reserved'?'Maskinen er allerede reserveret.':'Fejl ved reservation.','err');return;}
-  await sb.rpc('write_log',{p_user_id:cu.id,p_type:'reserve',p_tekst:'Reserveret maskine '+m.equipment_nr+' ('+m.type+') i '+resDays+' dage',p_machine_id:pendId});
-  closeModal();await loadMachines();rStats();rMachines();if(cu.role==='admin')rAdminM();
-  toast('Maskine '+m.equipment_nr+' reserveret i '+resDays+' dage.','ok');
+  try{
+    var res=await sb.rpc('reserve_machine',{p_machine_id:pendId,p_user_id:cu.id,p_days:resDays});
+    if(res.error||!res.data||!res.data.success){closeModal();toast(res.data&&res.data.error==='machine_already_reserved'?'Maskinen er allerede reserveret.':'Fejl ved reservation.','err');return;}
+    await sb.rpc('write_log',{p_user_id:cu.id,p_type:'reserve',p_tekst:'Reserveret maskine '+m.equipment_nr+' ('+m.type+') i '+resDays+' dage',p_machine_id:pendId});
+    closeModal();await loadMachines();rStats();rMachines();if(cu.role==='admin')rAdminM();
+    var activeTab=document.querySelector('.nav-tab.active');if(activeTab&&activeTab.dataset.tab==='mine')rMine();
+    toast('Maskine '+m.equipment_nr+' reserveret i '+resDays+' dage.','ok');
+  }catch(e){closeModal();toast('Netv\u00e6rksfejl. Pr\u00f8v igen.','err');}
 }
 async function doRel(){
   var m=machinesMap[pendId];if(!m)return;
-  var res=await sb.rpc('release_machine',{p_machine_id:pendId,p_user_id:cu.id,p_is_admin:cu.role==='admin'});
-  if(res.error||!res.data||!res.data.success){closeModal();toast('Fejl ved frigivelse.','err');return;}
-  await sb.rpc('write_log',{p_user_id:cu.id,p_type:'release',p_tekst:'Frigivet maskine '+m.equipment_nr+' ('+m.type+')',p_machine_id:pendId});
-  closeModal();await loadMachines();rStats();rMachines();if(cu.role==='admin')rAdminM();
-  toast('Maskine '+m.equipment_nr+' er nu ledig.','ok');
+  var btn=document.getElementById('m-btn');btn.disabled=true;btn.textContent='Frigiver...';
+  try{
+    var res=await sb.rpc('release_machine',{p_machine_id:pendId,p_user_id:cu.id,p_is_admin:cu.role==='admin'});
+    if(res.error||!res.data||!res.data.success){closeModal();toast('Fejl ved frigivelse.','err');return;}
+    await sb.rpc('write_log',{p_user_id:cu.id,p_type:'release',p_tekst:'Frigivet maskine '+m.equipment_nr+' ('+m.type+')',p_machine_id:pendId});
+    closeModal();await loadMachines();rStats();rMachines();if(cu.role==='admin')rAdminM();
+    var activeTab=document.querySelector('.nav-tab.active');if(activeTab&&activeTab.dataset.tab==='mine')rMine();
+    toast('Maskine '+m.equipment_nr+' er nu ledig.','ok');
+  }catch(e){closeModal();toast('Netv\u00e6rksfejl. Pr\u00f8v igen.','err');}
 }
 
 /* ===== ACTIONS: MACHINES (ADMIN) ===== */
