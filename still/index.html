@@ -385,7 +385,7 @@ function openM(action,id){
   }
   document.getElementById('modal').classList.add('open');
 }
-function closeModal(){document.getElementById('modal').classList.remove('open');document.getElementById('m-btn').style.background='';}
+function closeModal(){document.getElementById('modal').classList.remove('open');var btn=document.getElementById('m-btn');btn.style.background='';btn.disabled=false;}
 
 /* ===== ACTIONS: RESERVE / RELEASE ===== */
 async function doRes(){
@@ -544,8 +544,8 @@ async function rDash(){
   await loadLogs();
   var total=machinesArr.length,res=machinesArr.filter(function(m){return m.status==='reserveret';}).length,ledig=total-res;
   var logins=allLogs.filter(function(l){return l.type==='login';}).length;
-  var thisMonth=new Date().getMonth();
-  var thisM=allLogs.filter(function(l){return l.type==='reserve'&&new Date(l.tid).getMonth()===thisMonth;}).length;
+  var thisMonth=new Date().getMonth(),thisYear=new Date().getFullYear();
+  var thisM=allLogs.filter(function(l){var d=new Date(l.tid);return l.type==='reserve'&&d.getMonth()===thisMonth&&d.getFullYear()===thisYear;}).length;
   var dEl=document.getElementById('d-stats');
   dEl.textContent='';
   [{l:'Maskiner i alt',v:total,c:'ca'},{l:'Aktive reserv.',v:res,c:'cr'},{l:'Denne m\u00e5ned',v:thisM,c:'cb'},{l:'Logins total',v:logins,c:''}].forEach(function(it){
@@ -555,7 +555,7 @@ async function rDash(){
     sc.appendChild(sl);sc.appendChild(sv);dEl.appendChild(sc);
   });
   var monthlyData=new Array(12).fill(0);
-  allRes.forEach(function(r){monthlyData[new Date(r.created_at).getMonth()]++;});
+  allRes.forEach(function(r){var d=new Date(r.created_at);if(d.getFullYear()===thisYear)monthlyData[d.getMonth()]++;});
   var mc=document.getElementById('c-monthly');
   if(charts.m)charts.m.destroy();
   charts.m=new Chart(mc,{type:'bar',data:{labels:mNames,datasets:[{data:monthlyData,backgroundColor:'rgba(227,82,5,0.15)',borderColor:'rgba(227,82,5,0.6)',borderWidth:1,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#757575',font:{family:'Inter',size:11}},grid:{color:'#f0f0f0'}},y:{ticks:{color:'#757575',font:{family:'Inter',size:11},stepSize:1},grid:{color:'#f0f0f0'}}}}});
