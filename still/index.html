@@ -238,7 +238,7 @@ async function doLogin(){
   document.querySelector('.btn-p').disabled=false;
   if(res.error||!res.data||!res.data.success){document.getElementById('lerr').textContent='Forkert brugernavn eller adgangskode.';return;}
   cu=res.data.user;
-  sessionStorage.setItem('cu',JSON.stringify(cu));
+  localStorage.setItem('cu',JSON.stringify(cu));
   sb.rpc('write_log',{p_user_id:cu.id,p_type:'login',p_tekst:'Logget ind'});
   showApp();
   await loadAll();
@@ -246,7 +246,7 @@ async function doLogin(){
 }
 async function doLogout(){
   if(cu)sb.rpc('write_log',{p_user_id:cu.id,p_type:'logout',p_tekst:'Logget ud'});
-  cu=null;sessionStorage.removeItem('cu');
+  cu=null;localStorage.removeItem('cu');
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('app').style.display='none';
   document.getElementById('lu').value='';document.getElementById('lp').value='';document.getElementById('lerr').textContent='';
@@ -266,17 +266,17 @@ function showApp(){
   if(bs)bs.style.display=(cu.username===BULK_ADMIN)?'block':'none';
 }
 async function restoreSession(){
-  var stored=sessionStorage.getItem('cu');
+  var stored=localStorage.getItem('cu');
   if(!stored)return;
   try{
     cu=JSON.parse(stored);
     await loadUsers();
-    if(!usersMap[cu.id]){cu=null;sessionStorage.removeItem('cu');return;}
+    if(!usersMap[cu.id]){cu=null;localStorage.removeItem('cu');return;}
     var fresh=usersMap[cu.id];
     cu={id:fresh.id,username:fresh.username,display_name:fresh.display_name,role:fresh.role};
-    sessionStorage.setItem('cu',JSON.stringify(cu));
+    localStorage.setItem('cu',JSON.stringify(cu));
     showApp();await loadAll();startAutoRefresh();
-  }catch(e){cu=null;sessionStorage.removeItem('cu');}
+  }catch(e){cu=null;localStorage.removeItem('cu');}
 }
 
 /* ===== AUTO REFRESH ===== */
