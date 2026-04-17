@@ -157,7 +157,7 @@ tbody td{padding:12px 14px;font-size:13px;vertical-align:middle;}
 <div class="main" id="tab-log" style="display:none"><div class="lf-row"><button class="lf-btn active" onclick="fLog('alle',this)">Alle</button><button class="lf-btn" onclick="fLog('login',this)">Logins</button><button class="lf-btn" onclick="fLog('reserve',this)">Reservationer</button><button class="lf-btn" onclick="fLog('release',this)">Frigivelser</button><button class="lf-btn" onclick="fLog('admin',this)">Admin</button><button class="lf-btn" onclick="fLog('logout',this)">Logouts</button></div><div id="log-list"></div></div>
 <div class="main" id="tab-brugere" style="display:none"><div class="sec"><div class="sec-title">Tilføj bruger</div><div class="add-form"><div class="field"><label>Brugernavn</label><input type="text" id="nu-u" placeholder="f.eks. jens.jensen"></div><div class="field"><label>Visningsnavn</label><input type="text" id="nu-d" placeholder="f.eks. Jens Jensen"></div><div class="field"><label>Adgangskode</label><input type="password" id="nu-p" placeholder="Adgangskode"></div><div class="field"><label>Rolle</label><select id="nu-r"><option value="bruger">Bruger</option><option value="admin">Admin</option></select></div><button class="btn-add" onclick="addUser()">+ Tilføj</button></div></div><div class="sec"><div class="sec-title">Admin-brugere</div><p style="font-size:13px;color:var(--muted);margin-bottom:14px;">Har adgang til Dashboard, Aktivitetslog, Brugerstyring og Admin-panelet.</p><div id="au-list"></div></div><div class="sec"><div class="sec-title">Normale brugere</div><div id="nu-list"></div></div></div>
 <div class="main" id="tab-admin" style="display:none">
-<div class="sec" id="bulk-section" style="display:none"><div class="sec-title">Bulk upload maskiner (CSV / Excel)</div><div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div class="uz-main">Træk fil hertil eller <span class="uz-link">vælg fil</span></div><p>Accepterer .csv og .xlsx filer</p><input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])"></div><div class="upload-hint"><strong>Filen skal indeholde disse kolonner (rækkefølge er ligegyldig):</strong><br><code>ASSET TYPE</code> = Maskintype (f.eks. RX6035, EXV-SF14)<br><code>EQUIPMENT NUMBER</code> = 7-cifret Equipment Nr. (unik ID)<br><code>SERIAL NUMBER</code> = Serienummer<br><br>Første række skal være kolonnenavne. Maskiner der allerede findes bliver sprunget over.</div><div id="upload-preview" class="upload-preview"></div></div>
+<div class="sec" id="bulk-section"><div class="sec-title">Synkroniser maskinliste (ALE upload)</div><div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div class="uz-main">Upload ALE-liste for at synkronisere</div><p>Accepterer .csv og .xlsx filer</p><input type="file" id="file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleFile(this.files[0])"></div><div class="upload-hint"><strong>Workflow:</strong> Download ALE-listen og upload den her. Systemet viser en oversigt over hvad der sker, og du bekr&#230;fter f&#248;r noget &#230;ndres.<br><br><strong>S&#229;dan virker det:</strong><br>&#8226; Nye maskiner (p&#229; listen men ikke i systemet) tilf&#248;jes<br>&#8226; Maskiner der ikke er p&#229; listen fjernes (ogs&#229; hvis reserveret)<br>&#8226; Maskiner der allerede findes er 100% ur&#248;rt<br><br><strong style="color:var(--red)">VIGTIGT: &#197;bn IKKE filen i Excel f&#248;r upload. Upload direkte som den er downloadet.</strong></div><div id="upload-preview" class="upload-preview"></div></div>
 <div class="sec"><div class="sec-title">Tilføj enkelt maskine</div><div class="add-form"><div class="field"><label>Equipment Nr. (7 cifre)</label><input type="text" id="nm-id" placeholder="1234567" maxlength="7"></div><div class="field"><label>Type</label><input type="text" id="nm-type" placeholder="f.eks. RX6035"></div><div class="field"><label>Serienummer</label><input type="text" id="nm-serial" placeholder="f.eks. 516309X00124"></div><button class="btn-add" onclick="addMachine()">+ Tilføj</button></div></div>
 <div class="sec"><div class="sec-title">Alle maskiner (<span id="am-count">0</span>)</div><div style="margin-bottom:12px"><input class="sinput" type="text" id="am-search" placeholder="Søg i admin-liste..." oninput="rAdminM()" style="max-width:300px;padding-left:14px;"></div><div class="tw" style="margin-bottom:0"><table><thead><tr><th>Equipment Nr.</th><th>Type</th><th>Serienummer</th><th>Status</th><th>Reserveret af</th><th>Fjern</th></tr></thead><tbody id="am-tb"></tbody></table></div></div></div></div>
 <div class="mo" id="modal"><div class="md"><h3 id="m-title"></h3><div class="md-meta" id="m-meta"></div><div class="md-info" id="m-info"></div><div class="md-act"><button class="btn-cancel" onclick="closeModal()">Annuller</button><button class="btn-conf" id="m-btn">Bekræft</button></div></div></div>
@@ -265,7 +265,7 @@ function showApp(){
   rb.className='rb '+(cu.role==='admin'?'rb-a':'rb-b');
   if(cu.role==='admin')document.querySelectorAll('.adm-tab').forEach(function(e){e.classList.add('vis');});
   var bs=document.getElementById('bulk-section');
-  if(bs)bs.style.display=(cu.username===BULK_ADMIN)?'block':'none';
+  if(bs)bs.style.display=(cu.role==='admin')?'block':'none';
 }
 async function restoreSession(){
   var stored=localStorage.getItem('cu');
@@ -584,75 +584,235 @@ async function rDash(){
   }else{arEl.textContent='';var e3=document.createElement('div');e3.className='empty';e3.style.padding='20px';e3.textContent='Ingen aktive reservationer.';arEl.appendChild(e3);}
 }
 
-/* ===== BULK UPLOAD ===== */
-var pendingBulk=null;
+/* ===== ALE SYNC =====
+   All user-sourced data (equipment_nr, type, serienummer, display_name)
+   is escaped via esc() before insertion into innerHTML, matching the
+   existing XSS-prevention pattern used throughout this file.
+*/
+var pendingSync=null;
 var uzEl=document.getElementById('upload-zone');
+if(uzEl){
 uzEl.addEventListener('dragover',function(e){e.preventDefault();uzEl.classList.add('dragover');});
 uzEl.addEventListener('dragleave',function(){uzEl.classList.remove('dragover');});
 uzEl.addEventListener('drop',function(e){e.preventDefault();uzEl.classList.remove('dragover');if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0]);});
+}
 function handleFile(file){
   if(!file)return;
   var ext=file.name.split('.').pop().toLowerCase();
-  if(['csv','xlsx','xls'].indexOf(ext)<0){toast('Kun .csv og .xlsx filer underst\u00f8ttes.','err');return;}
+  if(['csv','xlsx','xls'].indexOf(ext)<0){toast('Kun .csv og .xlsx filer.','err');return;}
   var reader=new FileReader();
   if(ext==='csv'){reader.onload=function(e){parseCSV(e.target.result);};reader.readAsText(file);}
   else{reader.onload=function(e){var wb=XLSX.read(e.target.result,{type:'array'}),ws=wb.Sheets[wb.SheetNames[0]],csv=XLSX.utils.sheet_to_csv(ws,{FS:';'});parseCSV(csv);};reader.readAsArrayBuffer(file);}
 }
 function parseCSV(text){
+  text=text.replace(/^\uFEFF/,'');
   var lines=text.trim().split('\n').map(function(l){return l.replace(/\r/g,'');});
   if(lines.length<2){toast('Filen er tom eller har kun overskrifter.','err');return;}
-  var header=lines[0].split(';').map(function(h){return h.trim().toUpperCase().replace(/["\uFEFF]/g,'');});
-  var iType=header.findIndex(function(h){return h.indexOf('ASSET')>=0&&h.indexOf('TYPE')>=0;});
+  var sep=';';
+  var header=lines[0].split(sep).map(function(h){return h.trim().toUpperCase().replace(/["\uFEFF]/g,'');});
   var iEq=header.findIndex(function(h){return h.indexOf('EQUIPMENT')>=0&&h.indexOf('NUMBER')>=0;});
-  var iSerial=header.findIndex(function(h){return h.indexOf('SERIAL')>=0&&h.indexOf('NUMBER')>=0;});
   if(iEq===-1){
-    var hC=lines[0].split(',').map(function(h){return h.trim().toUpperCase().replace(/["\uFEFF]/g,'');});
-    var iEqC=hC.findIndex(function(h){return h.indexOf('EQUIPMENT')>=0&&h.indexOf('NUMBER')>=0;});
-    if(iEqC!==-1){var cL=lines.map(function(l){return l.split(',').map(function(c){return c.trim().replace(/^"|"$/g,'');});});return processParsed(cL.slice(1),hC.findIndex(function(h){return h.indexOf('ASSET')>=0&&h.indexOf('TYPE')>=0;}),iEqC,hC.findIndex(function(h){return h.indexOf('SERIAL')>=0&&h.indexOf('NUMBER')>=0;}));}
-    toast('Kolonne EQUIPMENT NUMBER ikke fundet. Tjek overskrifter.','err');return;
+    sep=',';
+    header=lines[0].split(sep).map(function(h){return h.trim().toUpperCase().replace(/["\uFEFF]/g,'');});
+    iEq=header.findIndex(function(h){return h.indexOf('EQUIPMENT')>=0&&h.indexOf('NUMBER')>=0;});
+    if(iEq===-1){toast('Kolonne EQUIPMENT NUMBER ikke fundet. Tjek overskrifter.','err');return;}
   }
-  processParsed(lines.slice(1).map(function(l){return l.split(';').map(function(c){return c.trim().replace(/^"|"$/g,'');});}),iType,iEq,iSerial);
+  var iType=header.findIndex(function(h){return h.indexOf('ASSET')>=0&&h.indexOf('TYPE')>=0;});
+  var iSerial=header.findIndex(function(h){return h.indexOf('SERIAL')>=0&&h.indexOf('NUMBER')>=0;});
+  var rows=lines.slice(1).map(function(l){return l.split(sep).map(function(c){return c.trim().replace(/^"|"$/g,'');});});
+  processSync(rows,iType,iEq,iSerial);
 }
-function processParsed(rows,iType,iEq,iSerial){
-  var existingEqs={};machinesArr.forEach(function(m){existingEqs[m.equipment_nr]=1;});
-  var parsed=[];var skipped=0;
+async function processSync(rows,iType,iEq,iSerial){
+  /* 1. Refresh data fra DB (aldrig brug cached data) */
+  await loadUsers();
+  await loadMachines();
+  /* 2. Parse CSV rows */
+  var csvMachines=[];
+  var csvEqSet={};
+  var rejected=[];
   rows.forEach(function(cols){
-    var eq=cols[iEq]?cols[iEq].trim():'';if(!eq||!/^\d{7}$/.test(eq))return;
-    var type=iType>=0?(cols[iType]?cols[iType].trim():'Ukendt')||'Ukendt':'Ukendt';
+    var eq=cols[iEq]?cols[iEq].trim():'';
+    if(!eq)return;
+    if(!/^\d{7}$/.test(eq)){rejected.push(eq);return;}
+    if(csvEqSet[eq])return;
+    csvEqSet[eq]=1;
+    var type=iType>=0?(cols[iType]?cols[iType].trim():'')||'':'';
     var serial=iSerial>=0?(cols[iSerial]?cols[iSerial].trim():''):'';
-    if(existingEqs[eq]){skipped++;return;}
-    parsed.push({eq:eq,type:type,serial:serial});
+    csvMachines.push({eq:eq,type:type,serial:serial});
   });
-  pendingBulk=parsed;
+  /* FAILSAFE: Block if 0 valid rows */
+  if(csvMachines.length===0){
+    document.getElementById('upload-preview').textContent='';
+    var errDiv=document.createElement('div');
+    errDiv.style.cssText='padding:18px;color:var(--red);font-size:14px;font-weight:600';
+    errDiv.textContent='Ingen gyldige maskiner fundet i filen. Upload afvist.';
+    document.getElementById('upload-preview').appendChild(errDiv);
+    return;
+  }
+  /* 3. Compute diff */
+  var dbEqMap={};
+  machinesArr.forEach(function(m){dbEqMap[m.equipment_nr]=m;});
+  var toAdd=csvMachines.filter(function(c){return !dbEqMap[c.eq];});
+  var toDelete=machinesArr.filter(function(m){return !csvEqSet[m.equipment_nr];});
+  var unchanged=machinesArr.filter(function(m){return !!csvEqSet[m.equipment_nr];});
+  /* Find which deletions have active reservations */
+  var deleteWithRes=toDelete.filter(function(m){return m.status==='reserveret'&&m.reservation;});
+  /* 4. Store pending sync */
+  pendingSync={toAdd:toAdd,toDelete:toDelete,unchanged:unchanged,deleteWithRes:deleteWithRes};
+  /* 5. Render preview using DOM methods + esc() for user data */
+  renderSyncPreview(toAdd,toDelete,unchanged,deleteWithRes,rejected);
+}
+function renderSyncPreview(toAdd,toDelete,unchanged,deleteWithRes,rejected){
   var prev=document.getElementById('upload-preview');
-  if(!parsed.length&&!skipped){prev.innerHTML='<div style="padding:14px;color:var(--red);font-size:13px">Ingen gyldige maskiner fundet i filen.</div>';return;}
-  var html='<div class="up-count">Fundet: <span class="up-new">'+parsed.length+' nye maskiner</span>';
-  if(skipped)html+=' &middot; <span class="up-skip">'+skipped+' allerede i systemet (springes over)</span>';
-  html+='</div>';
-  if(parsed.length){
-    html+='<div class="tw"><table><thead><tr><th>Equipment Nr.</th><th>Type</th><th>Serienummer</th></tr></thead><tbody>';
-    parsed.slice(0,10).forEach(function(r){html+='<tr><td class="mid">'+esc(r.eq)+'</td><td>'+esc(r.type)+'</td><td class="mserial">'+esc(r.serial)+'</td></tr>';});
-    if(parsed.length>10)html+='<tr><td colspan="3" style="text-align:center;color:var(--muted);font-size:12px;padding:8px">... og '+(parsed.length-10)+' mere</td></tr>';
-    html+='</tbody></table></div><button class="btn-add" id="bulk-btn" onclick="confirmBulk()" style="margin-top:10px">Import\u00e9r '+parsed.length+' maskiner</button> <button class="btn-sm" onclick="cancelBulk()" style="margin-top:10px">Annuller</button>';
+  prev.textContent='';
+  /* Summary cards */
+  var statsRow=document.createElement('div');
+  statsRow.style.cssText='display:flex;gap:12px;margin:16px 0;flex-wrap:wrap';
+  var cards=[
+    {label:'Tilf\u00f8jes',val:toAdd.length,color:'var(--green)',cls:'cg'},
+    {label:'Fjernes',val:toDelete.length,color:'var(--red)',cls:'cr'},
+    {label:'Ur\u00f8rt',val:unchanged.length,color:'var(--border)',cls:''}
+  ];
+  cards.forEach(function(c){
+    var card=document.createElement('div');
+    card.className='sc';card.style.cssText='flex:1;min-width:120px;border-left:3px solid '+c.color;
+    var lbl=document.createElement('div');lbl.className='sl';lbl.textContent=c.label;
+    var val=document.createElement('div');val.className='sv '+c.cls;
+    if(!c.cls)val.style.color='var(--muted)';
+    val.textContent=c.val;
+    card.appendChild(lbl);card.appendChild(val);statsRow.appendChild(card);
+  });
+  prev.appendChild(statsRow);
+  /* No changes */
+  if(toAdd.length===0&&toDelete.length===0){
+    var noChange=document.createElement('div');
+    noChange.style.cssText='padding:18px;text-align:center;color:var(--green);font-size:14px;font-weight:600';
+    noChange.textContent='Maskinlisten er allerede opdateret. Ingen \u00e6ndringer n\u00f8dvendige.';
+    prev.appendChild(noChange);
+    pendingSync=null;
+    document.getElementById('file-input').value='';
+    return;
   }
-  prev.innerHTML=html;
+  /* Reservation warning */
+  if(deleteWithRes.length>0){
+    var warnBox=document.createElement('div');
+    warnBox.style.cssText='background:rgba(211,47,47,.06);border:1px solid rgba(211,47,47,.3);padding:14px 16px;margin-bottom:14px;border-radius:4px';
+    var warnTitle=document.createElement('div');
+    warnTitle.style.cssText='font-size:13px;font-weight:700;color:var(--red);margin-bottom:8px';
+    warnTitle.textContent=deleteWithRes.length+' maskine'+(deleteWithRes.length>1?'r':'')+' med aktiv reservation fjernes:';
+    warnBox.appendChild(warnTitle);
+    deleteWithRes.forEach(function(m){
+      var line=document.createElement('div');
+      line.style.cssText='font-size:13px;padding:4px 0;color:var(--text)';
+      line.textContent=m.equipment_nr+' ('+m.type+') \u2014 reserveret af '+(m.reservation?m.reservation.display_name:'');
+      warnBox.appendChild(line);
+    });
+    prev.appendChild(warnBox);
+  }
+  /* Rejected rows */
+  if(rejected.length>0){
+    var rejBox=document.createElement('div');
+    rejBox.style.cssText='background:rgba(227,82,5,.06);border:1px solid rgba(227,82,5,.3);padding:14px 16px;margin-bottom:14px;border-radius:4px;font-size:13px';
+    rejBox.textContent=rejected.length+' r\u00e6kker afvist (ugyldigt format): '+rejected.slice(0,5).join(', ')+(rejected.length>5?' ...':'');
+    prev.appendChild(rejBox);
+  }
+  /* Table: machines to add */
+  if(toAdd.length>0){
+    var addSec=document.createElement('div');addSec.style.marginBottom='14px';
+    var addTitle=document.createElement('div');
+    addTitle.style.cssText='font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--green);margin-bottom:8px';
+    addTitle.textContent='Tilf\u00f8jes ('+toAdd.length+')';
+    addSec.appendChild(addTitle);
+    var addTw=document.createElement('div');addTw.className='tw';
+    var addTbl=document.createElement('table');
+    var addThead='<thead><tr><th>Equipment Nr.</th><th>Type</th><th>Serienummer</th></tr></thead>';
+    var addTbody='<tbody>';
+    toAdd.slice(0,10).forEach(function(r){
+      addTbody+='<tr><td class="mid">'+esc(r.eq)+'</td><td style="font-size:13px">'+esc(r.type)+'</td><td class="mserial">'+esc(r.serial)+'</td></tr>';
+    });
+    if(toAdd.length>10)addTbody+='<tr><td colspan="3" style="text-align:center;color:var(--muted);font-size:12px;padding:8px">... og '+(toAdd.length-10)+' mere</td></tr>';
+    addTbody+='</tbody>';
+    addTbl.innerHTML=addThead+addTbody;
+    addTw.appendChild(addTbl);addSec.appendChild(addTw);prev.appendChild(addSec);
+  }
+  /* Table: machines to delete */
+  if(toDelete.length>0){
+    var delSec=document.createElement('div');delSec.style.marginBottom='14px';
+    var delTitle=document.createElement('div');
+    delTitle.style.cssText='font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--red);margin-bottom:8px';
+    delTitle.textContent='Fjernes ('+toDelete.length+')';
+    delSec.appendChild(delTitle);
+    var delTw=document.createElement('div');delTw.className='tw';
+    var delTbl=document.createElement('table');
+    var delThead='<thead><tr><th>Equipment Nr.</th><th>Type</th><th>Status</th><th>Reserveret af</th></tr></thead>';
+    var delTbody='<tbody>';
+    toDelete.slice(0,15).forEach(function(m){
+      var isR=m.status==='reserveret'&&m.reservation;
+      delTbody+='<tr'+(isR?' style="background:rgba(211,47,47,.04)"':'')+'><td class="mid">'+esc(m.equipment_nr)+'</td><td style="font-size:13px">'+esc(m.type)+'</td><td>'+(isR?'<span class="badge br">Reserveret</span>':'<span class="badge bl">Ledig</span>')+'</td><td style="font-size:13px">'+(isR?esc(m.reservation.display_name):'\u2014')+'</td></tr>';
+    });
+    if(toDelete.length>15)delTbody+='<tr><td colspan="4" style="text-align:center;color:var(--muted);font-size:12px;padding:8px">... og '+(toDelete.length-15)+' mere</td></tr>';
+    delTbody+='</tbody>';
+    delTbl.innerHTML=delThead+delTbody;
+    delTw.appendChild(delTbl);delSec.appendChild(delTw);prev.appendChild(delSec);
+  }
+  /* Confirm / Cancel buttons */
+  var btnRow=document.createElement('div');btnRow.style.cssText='display:flex;gap:10px;margin-top:16px';
+  var cancelBtn=document.createElement('button');cancelBtn.className='btn-cancel';cancelBtn.id='sync-cancel';cancelBtn.style.flex='1';cancelBtn.textContent='Annuller';cancelBtn.onclick=cancelSync;
+  var confBtn=document.createElement('button');confBtn.className='btn-conf';confBtn.id='sync-btn';confBtn.style.cssText='flex:2;background:var(--accent)';
+  confBtn.textContent='Bekr\u00e6ft synkronisering ('+toAdd.length+' tilf\u00f8jes, '+toDelete.length+' fjernes)';
+  confBtn.onclick=confirmSync;
+  btnRow.appendChild(cancelBtn);btnRow.appendChild(confBtn);prev.appendChild(btnRow);
 }
-async function confirmBulk(){
-  if(!pendingBulk||!pendingBulk.length)return;
-  var btn=document.getElementById('bulk-btn');
-  if(btn){btn.disabled=true;btn.textContent='Importerer...';}
-  var count=0;
-  for(var i=0;i<pendingBulk.length;i++){
-    var r=pendingBulk[i];
-    var res=await sb.rpc('add_machine',{p_admin_id:cu.id,p_equipment_nr:r.eq,p_type:r.type||null,p_serienummer:r.serial||null});
-    if(res.data&&res.data.success)count++;
+async function confirmSync(){
+  if(!pendingSync)return;
+  var btn=document.getElementById('sync-btn');
+  if(!btn||btn.disabled)return;
+  btn.disabled=true;
+  var cancelBtn=document.getElementById('sync-cancel');
+  if(cancelBtn)cancelBtn.disabled=true;
+  var toAdd=pendingSync.toAdd;
+  var toDelete=pendingSync.toDelete;
+  var total=toAdd.length+toDelete.length;
+  var done=0;
+  var addOk=0,addFail=0,delOk=0,delFail=0;
+  function updateProgress(){
+    done++;
+    btn.textContent='Synkroniserer... ('+done+'/'+total+')';
   }
-  if(count>0)await sb.rpc('write_log',{p_user_id:cu.id,p_type:'admin',p_tekst:'Bulk upload: '+count+' maskiner importeret'});
-  pendingBulk=null;document.getElementById('upload-preview').textContent='';document.getElementById('file-input').value='';
+  /* ADDS FIRST (safe: worst case = extra machines) */
+  for(var i=0;i<toAdd.length;i++){
+    var r=toAdd[i];
+    try{
+      var res=await sb.rpc('add_machine',{p_admin_id:cu.id,p_equipment_nr:r.eq,p_type:r.type||null,p_serienummer:r.serial||null});
+      if(res.data&&res.data.success)addOk++;else addFail++;
+    }catch(e){addFail++;}
+    updateProgress();
+  }
+  /* DELETES LAST (irreversible: CASCADE removes reservations) */
+  for(var i=0;i<toDelete.length;i++){
+    var m=toDelete[i];
+    try{
+      var res=await sb.rpc('delete_machine',{p_admin_id:cu.id,p_machine_id:m.id});
+      if(res.data&&res.data.success)delOk++;else delFail++;
+    }catch(e){delFail++;}
+    updateProgress();
+  }
+  /* Log the sync */
+  var logMsg='ALE sync: '+addOk+' tilf\u00f8jet, '+delOk+' fjernet';
+  if(pendingSync.deleteWithRes.length>0)logMsg+=' ('+pendingSync.deleteWithRes.length+' med reservation)';
+  await sb.rpc('write_log',{p_user_id:cu.id,p_type:'admin',p_tekst:logMsg});
+  /* Reset and reload */
+  pendingSync=null;
+  document.getElementById('upload-preview').textContent='';
+  document.getElementById('file-input').value='';
   await loadMachines();buildTypeFilter();rStats();rMachines();rAdminM();
-  toast(count+' maskiner importeret.','ok');
+  if(cu.role==='admin'){await loadLogs();rLog();}
+  /* Result toast */
+  var msg='Sync f\u00e6rdig: '+addOk+' tilf\u00f8jet, '+delOk+' fjernet.';
+  if(addFail>0||delFail>0)msg+=' ('+(addFail+delFail)+' fejlede)';
+  toast(msg,addFail+delFail>0?'err':'ok');
 }
-function cancelBulk(){pendingBulk=null;document.getElementById('upload-preview').textContent='';document.getElementById('file-input').value='';}
+function cancelSync(){pendingSync=null;document.getElementById('upload-preview').textContent='';document.getElementById('file-input').value='';}
 
 /* ===== NAV ===== */
 function go(tab){
